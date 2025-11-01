@@ -1,0 +1,166 @@
+--
+title: "Week 2: Descriptive Statistics using Oswego Data Set"
+subtitle: "Week2-DescriptiveStatistics.Rmd"
+author: "Wayne Enanoria"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Show R code in output for all R chunks
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Purpose
+
+The purpose of this file is to show how to conduct descriptive statistics using R. 
+
+In this session, we will use data from a church outbreak in a small village of Lycoming, Oswego County, NY, on April 18, 1940. 
+
+
+## Step 1: Import the data set and conduct descriptive statistics using one variable.
+
+```{r}
+# Import the data
+oswego <- read.csv("~/PHW253_2022/PHW253Oswegorevised.csv",
+                   header=TRUE,
+                   na.strings=".")
+# look at the number of records (first number) and variables (second number)
+dim(oswego)
+
+# Summarize age variable
+summary(oswego$age)
+
+# Create a histogram of the age variable
+hist(oswego$age, main="Histogram of Age (Years)", xlab="Age (Years)")
+
+# Create a boxplot of the age variable
+boxplot(oswego$age, main="Boxplot of Age (Years)")
+
+# Show other quantiles
+quantile(oswego$age)
+quantile(oswego$age, probs=c(0.25, 0.50,  0.75, 0.90, 0.99))
+
+# look at the mean, median, and range
+mean(oswego$age)
+median(oswego$age)
+range(oswego$age)
+
+# min and max
+min(oswego$age)
+max(oswego$age)
+```
+
+## Step 2: Descriptive Statistics of one continuous variable across one categorical variable
+
+```{r}
+# Create a boxplot
+boxplot(oswego$age ~ oswego$sex, 
+        main="Boxplot of Age (Years) by Gender",
+        xlab="Gender",
+        ylab="Age (Years)")
+
+tapply(oswego$age, oswego$sex, summary,)
+tapply(oswego$age, oswego$sex, quantile, probs=c(0.25, 0.50,  0.75, 0.90, 0.99))
+
+# Recode gender variable
+table(oswego$sex, exclude=NULL)
+
+# copy the original variable
+oswego$gender <- oswego$sex
+
+# recode the male category
+oswego$gender[oswego$sex=="M"] <- "Male"
+
+# recode the female category
+oswego$gender[oswego$sex=="F"] <- "Female"
+
+# check your work
+table(oswego$sex, oswego$gender, exclude=NULL)
+
+# Now you can re-run previous boxplot with recoded gender variable
+boxplot(oswego$age ~ oswego$gender, 
+        colors=c("blue", "gray"),
+        main="Boxplot of Age (Years) by Gender",
+        xlab="Gender",
+        ylab="Age (Years)")
+```
+
+## Step 3: Crosstable with two categorical variables
+
+```{r}
+# For this one, we will use the janitor R package
+library(janitor)
+
+# Recreate age variable from Week 1
+oswego$agecat <- cut(x=oswego$age,
+                     breaks=c(0, 1, 5, 10, 20, 30, 40, 50, 60, 200),
+                     labels=c("<1", "1-5", "6-10", "11-20", "21-30","31-40", "41-50", "51-60", "61+"))
+
+oswego %>% tabyl(agecat)
+
+# format the percents properly
+oswego %>% tabyl(agecat) %>% adorn_pct_formatting() 
+
+# you can look at two categories at one time
+oswego %>% tabyl(agecat, sex)
+oswego %>% tabyl(agecat, ill)
+
+# you can look at each gender separately
+oswego[oswego$sex=="M",] %>% tabyl(agecat)
+oswego[oswego$sex=="F",] %>% tabyl(agecat)
+
+
+## display counts & percents and include labels
+oswego %>%                                    # case linelist / data source
+  tabyl(agecat, ill) %>%                      # cross-tabulate counts
+  adorn_totals(where = "row") %>%             # add a total row
+  adorn_percentages(denominator = "col") %>%  # convert to proportions
+  adorn_pct_formatting() %>%                  # convert to percents
+  adorn_ns(position = "front") %>%            # display as: "count (percent)"
+  adorn_title(                                # adjust titles
+    row_name = "Age Category",
+    col_name = "Ill")
+```
+
+## Step 4: Save result to a MS Word document
+
+```{r}
+# Bonus task: export to a MS Word document
+library(flextable)
+
+oswego %>%                                    # case linelist
+  tabyl(agecat, ill) %>%                      # cross-tabulate counts
+  adorn_totals(where = "row") %>%             # add a total row
+  adorn_percentages(denominator = "col") %>%  # convert to proportions
+  adorn_pct_formatting() %>%                  # convert to percents
+  adorn_ns(position = "front") %>%            # display as: "count (percent)"
+  adorn_title(                                # adjust titles
+    row_name = "Age Category",
+    col_name = "Ill",
+    placement = "combined") %>% 
+  flextable::flextable() %>%                  # convert to image
+  flextable::autofit() %>%                    # ensure only one line per row
+  flextable::save_as_docx(path = "~/PHW253_2022/tabyl_ageill.docx")   # save as Word document
+```
+
+## Step 5: Creating a table using kable()
+
+```{r}
+# Usekable to create a table
+library(knitr)
+
+table(oswego$agecat)
+kable(table(oswego$agecat))
+kable(table(oswego$agecat), col.names=c("Age (Years)","Frequency"), align="lc")
+
+table(oswego$agecat, oswego$ill, exclude=NULL)
+kable(table(oswego$agecat, oswego$ill, exclude=NULL))
+kable(table(oswego$agecat, oswego$ill, exclude=NULL), caption="Frequency of Age (years) by Ill Status")
+
+
+```
+
+This is the end of the file.
+
+

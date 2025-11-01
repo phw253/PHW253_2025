@@ -1,0 +1,130 @@
+--
+title: "Week 2: Working with Dates in R"
+subtitle: "Week2-WorkingWithDates.Rmd"
+author: "Wayne Enanoria"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Show R code in output for all R chunks
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Purpose
+
+The purpose of this file is to show how to work with dates using R. 
+
+In this session, we will use data from a church outbreak in a small village of Lycoming, Oswego County, NY, on April 18, 1940. 
+
+
+## Step 1: Import the data set.
+
+```{r}
+# Import the data
+oswego <- read.csv("~/PHW253_2022/PHW253Oswegorevised.csv",
+                   header=TRUE,
+                   na.strings=".")
+# look at the number of records (first number) and variables (second number)
+dim(oswego)
+```
+
+## Step 2: Let's look at the onset date variable
+
+We will look at the onset of illness date variable in the data set. Before doing anything with dates, we must look at the raw entries in the data file to see if there is anything odd about the variable itself. Similarly, we can look at the entries for the time of onset of symptoms if the person reported being ill. In working with data, you should ask several questions:
+
+* Does it contain values or entries that you would expect for a date or time variable?
+* If so, what format are the raw date dates in? Month-Year, Month-Day-Year? Four or two digit years? What about time?
+* Are there any missing values in the variable? Given the meaning of the data (i.e., an outbreak from among a church group), would you expect to have missing values?
+
+Now, let's look at some R code to get to know our data.
+
+```{r}
+# Look at onset date variable
+oswego$onsetdate
+table(oswego$onsetdate, exclude=NULL)
+
+
+# Task 1: fill in the year for onset date
+
+# First, only replace 4/18 -- set others to missing (NA)
+oswego$xonsetdate <- ifelse(oswego$onsetdate=="4/18","1940-04-18", NA)
+
+# Look at what we did
+oswego[,c("onsetdate","xonsetdate")]
+
+# Second, replace 4/19
+oswego$xonsetdate[oswego$onsetdate=="4/19"] <- "1940-04-19"
+
+# Look at what we did
+oswego[,c("onsetdate","xonsetdate")]
+
+# Check your work
+table(oswego$xonsetdate, oswego$onsetdate, exclude=NULL)
+```
+
+## Step 3: Let's look at the time variable
+
+Next, we can focus our attention on the time of illness onset variable.
+
+```{r
+oswego$onsettime
+oswego$onsettime24
+
+# right now, the variable you created is a character variable, aka text 
+str(oswego$xonsetdate)
+
+# Create a date variable that R can recognize
+oswego$onsetdt <- as.Date(oswego$xonsetdate, format="%Y-%m-%d")
+str(oswego$onsetdt)
+```
+
+Now, we can put the date and time variables together to create one date-time variable with both data elements.
+
+```{r}
+# format the date time variable
+oswego$onsetdttime <- as.POSIXct(paste(oswego$xonsetdate, oswego$onsettime24), 
+                                 format="%Y-%m-%d %H:%M",
+                                 tz="EST")
+
+# Check your work
+oswego[,c("xonsetdate","onsettime24","onsetdttime")]
+```
+
+Next, we can look to see if there are any missing values and, if so, try to determine the reason.
+
+```{r}
+# How many people got sick?
+table(oswego$ill, exclude=NULL)
+
+# How many missing values among those who reported being ill
+table(is.na(oswego$onsetdttime[oswego$ill=="Y"]))
+# no missing values among those that reported being ill
+
+# How many missing values in the variable
+table(is.na(oswego$onsetdttime))
+# 27 missing (they did not report being sick)
+# 45 non-missing (among those who got sick)
+
+```
+
+## Step 4: Create an Epidemic Curve
+
+Finally, we can create an epidemic (epi) curve now that we have worked with our date and time variables to create one date-time variable.
+
+```{r}
+# epicurve
+library(EpiCurve)
+
+# Only take the non-missing values
+EpiCurve(x=oswego[!is.na(oswego$onsetdt),],
+         date = "onsetdttime", 
+         period = "hour", colors ="#9900ef",
+         xlabel="Onset Date and Time",
+         ylabel="Frequency",
+         note="There are no missing values among people who reported feeling ill.")
+```
+
+This is the end of the file.
+
+
