@@ -1,0 +1,223 @@
+--
+title: "PHW253 Descriptive Epidemiology Assignment"
+author: "Wayne Enanoria"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Show R code in output for all R chunks
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Overview
+
+* Purpose: Code for Week 3 Descriptive Epi Assignment
+* Data: PH W253 Wk4 Assignment line list_redacted.xlxs
+
+
+# Preliminary
+
+You may have to install new packages for this assignment. 
+
+```{r, include=FALSE}
+## load packages
+## run everytime
+## rio needed for import code
+library(rio)
+
+## dplyr needed for mutate or recode
+library(dplyr)
+
+## janitor needed for crosstable
+library(janitor)
+
+## flextable needed for export formatted table to Word file
+library(flextable)
+
+# for dates in R
+library(lubridate)
+
+# ggplot2 for epicurves & data visualization
+library (ggplot2)
+
+# incidence2 for epicurves of linelist data
+library (incidence2)
+```
+
+# Data Set
+
+Next, call in the data.
+
+```{r}
+outbreak <- import("~/PHW253_2023/PH W253 Descriptive Epi Assignment line list_redacted.xlsx")
+names(outbreak)
+head(outbreak)
+```
+
+# Assignment
+
+You can break this code up into smaller R chunks if you wish.
+
+```{r}
+## Descriptive Epi Assignment instructions  
+## state "same outbreak MLVA pattern (Pattern A, A2, and A3)"
+table(outbreak$MLVA)
+table(outbreak$MLVA, exclude=NULL)
+
+## there are 92 observations in the data set
+## 75 cases had are MLVA pattern A, 1 case pattern A2, 1 case pattern A3
+## other E.coli cases did not have MLVA pattern A, A2, pr A3 and are not a part of this outbreak
+
+## create new dataset where only the statement within parentheses is TRUE is kept
+# uses dplyr package 
+outbreakA <- outbreak %>% 
+             filter(MLVA == "A" |MLVA == "A2" |MLVA == "A3")   
+# keep only rows where MLVA is an A, A2,A3 pattern
+
+head(outbreakA)
+
+
+```
+
+# Dates in R
+
+Now we will handle the dates.
+
+```{r}
+## Dates in R
+## Step 1: What format is the OnsetDate in?
+class(outbreakA$OnsetDate)
+
+## Step 2: use package lubridate to convert to Date format
+outbreakA <- outbreakA %>%
+             mutate(newOnset = lubridate::ymd(OnsetDate))
+
+## Step 3: confirm that new variable format
+class(outbreakA$newOnset)
+
+table(outbreakA$newOnset, exclude=NULL)
+## dates range from March to July 2009 & there are missing values
+```
+
+
+
+# Epidemic Curve by Day
+
+Now we create an epidemic curve.
+
+NOTE: It is difficult to see epi peak on daily curve. The rest of code creates a WEEKLY epi curve in using incidence2 package or ggplot package
+
+## Using incidence2 package, Create an epi_day dataframe
+
+
+```{r}
+epi_day <- incidence(       # create incidence object
+  x = outbreakA,             # dataset
+  date_index = "newOnset",  # date column
+  interval = "day"          # date grouping interval
+)
+
+# NOTE: the log states that 7 missing observations were removed from epi_day.
+epi_day
+
+# Plot the epi curve
+plot(epi_day)
+
+## Notes: 
+##   1) epi curve is missing title & label on x-axis & footnote indicating missing data     
+##   2) epi curve starts mid-March
+##   3) epi curve has grid lines
+```
+ 
+```{r}
+# Plot the epi curve with labels and formatting
+
+plot(epi_day, xlab = "Date of illness onset") + 
+  labs(title = "Figure 1. Epidemic Curve for an outbreak of E. coli O157:H7, March 1 – July 31, 2009", caption="Figure does not include n=7 individuals with missing onset date.") + 
+  scale_x_date(limits = c(as.Date("2009-03-01"), NA)) +
+  theme_classic()
+```
+
+
+## Using incidence2 package, epidemic curve by week
+
+```{r}
+epi_week <- incidence(              # create incidence object
+            x = outbreakA,          # dataset
+            date_index = "newOnset",  # date column
+            interval = 7            # date grouping interval e.g., every 7 days
+)
+## NOTE: log states that 7 missing observations were removed from epi_week
+
+epi_week
+ 
+# Plot the epi curve
+plot(epi_week)
+
+## If above code will not plot use the below code
+epi_week <- incidence(              # create incidence object
+            x = outbreakA,          # dataset
+            date_index = "newOnset",  # date column
+            interval = "week"            # date grouping interval e.g., every 7 days
+)
+## NOTE: log states that 7 missing observations were removed from epi_week
+
+epi_week
+ 
+# Plot the epi curve
+plot(epi_week)
+
+
+```
+
+## Refine the epidemic curve
+
+```{r}
+plot(epi_week, xlab = "Date of illness onset") + 
+  labs(title = "Figure 1. Epidemic Curve for an outbreak of E. coli O157:H7, March – July, 2009", caption="Figure does not include n=7 individuals with missing onset date.") + 
+  theme_classic()
+```
+
+
+
+
+## Using ggplot, create a weekly epidemic curve
+
+The below code provides plot with all labels
+
+```{r}
+weekly_breaks <- seq.Date(from = as.Date("2009-03-01"),
+                          to = as.Date("2009-07-31"),
+                          by = "week")
+
+ggplot(data = outbreakA) + 
+  # make histogram: specify bin break points above
+  geom_histogram(
+  # mapping aesthetics
+  mapping = aes(x = newOnset),  # date column mapped to x-axis
+  # histogram bin breaks
+  breaks = weekly_breaks, # histogram bin breaks defined previously
+  # bars
+  color = "darkblue",     # color of lines around bars
+  fill = "lightblue"      # color of fill within bars
+  ) + 
+    # y-axis
+    scale_y_continuous(  breaks = seq(from = 0, to = 14, by = 2),  # specify y-axis increments by 2
+                       expand = c(0,0))+             # remove excess y-axis space below 0 (align histogram flush with x-axis)
+
+  # aesthetic themes
+  theme_classic() +                # simplify plot background
+  theme(
+    plot.caption = element_text(hjust = 0)) +       # caption on left side
+    # labels including caption
+    labs(
+    title    = "Figure 1. Epidemic Curve for an outbreak of E. coli O157:H7, March 1 – July 31, 2009" ,
+    x        = "Date of illness onset" ,
+    y        = "Weekly incident cases" ,
+    caption  = "Figure does not include n=7 individuals with missing onset date."
+    )
+
+```
+
+
