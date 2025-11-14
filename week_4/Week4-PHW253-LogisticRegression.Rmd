@@ -1,0 +1,73 @@
+---
+title: "PHW253 Logistic Regression"
+author: "Wayne Enanoria"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Show R code in output for all R chunks
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Overview
+
+* Purpose: Code for Week 4 Logistic Regression
+* Data: PHW253Oswegorevised.csv
+
+
+# Preliminary
+
+We will not need any special R packages for this assignment.
+
+# Data Set
+
+Next, call in the data.
+
+```{r}
+oswego <- read.csv("~/PHW253_2023/PHW253Oswegorevised.csv",
+                     header=TRUE,
+                     na.strings=".")
+dim(oswego)
+names(oswego)
+```
+
+# Data Management for Logistic Regression
+
+The glm() function (generalized linear model) we will use in R requires that the variables of the model be numeric or factor variables. So we will have to do some data manipulation with our data before we can run the R code to conduct logistic regression.
+
+```{r}
+# Examine the outcome variable, ill
+table(oswego$ill, exclude=NULL)
+
+# Create a numeric variable for Ill
+oswego$xill <- ifelse(oswego$ill=="Y", 1, 0)
+# Check your code
+table(oswego$xill, oswego$ill, exclude=NULL)
+
+# Examine the exposure variable, mashedpotato
+table(oswego$mashedpotato, exclude=NULL)
+
+# Create a numeric variable for mashedpotato
+oswego$xmashedpot <- NA
+oswego$xmashedpot[oswego$mashedpotato=="Y"] <- 1
+oswego$xmashedpot[oswego$mashedpotato=="N"] <- 0
+table(oswego$xmashedpot, oswego$mashedpotato, exclude=NULL)
+
+# Look at the two-by-two table
+table(oswego$mashedpotato, oswego$xill, exclude=NULL)
+
+# Run the logistic regression
+rslt2 <- glm(xill~ xmashedpot, data=oswego, family=binomial(link="logit"))
+summary(rslt2)
+
+# Estimate the odds ratio
+exp(coef(rslt2))
+# Only the odds ratio
+exp(coef(rslt2)[2])
+
+# Confidence intervals
+exp(confint.default(rslt2))
+```
+
+
