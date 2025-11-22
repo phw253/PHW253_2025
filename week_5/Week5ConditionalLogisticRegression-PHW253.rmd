@@ -1,0 +1,176 @@
+---
+title: "Week 5 Conditional Logistic Regression"
+author: "Wayne Enanoria"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Show R code in output for all R chunks
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Overview
+
+* Purpose: Code for Week 5 Conditional Logistic Regression Video 
+* Data: PHW253_Wk6_CaseControlStudy_redacted_notxt.xlsx
+
+
+# Preliminary
+
+Call in the necessary R packages for this assignment.
+
+```{r, echo=FALSE}
+## load packages
+## run everytime
+
+## rio needed for import code
+library(rio)
+## dplyr needed for mutate or recode
+library(dplyr)
+## janitor needed for crosstable
+library(janitor)
+## survival needed for clogit
+library(survival)
+```
+
+# Data Set
+
+* In Weeks 1-3, we used line listing (a dataset with only the cases)
+* In Weeks 4-6, we will use outbreak investigation dataset (a matched case-control study)
+
+```{r}
+## import
+ecoli <- import("~/PHW253_2023/PHW253_Wk6_CaseControlStudy_redacted_notxt.xlsx")
+
+## look at the dataset 
+## example: names(dataset)
+dim(ecoli)
+names(ecoli)
+
+## janitor package clean names changes the column names to lower case & replaces
+## the spaces in column names with an underscore
+## example: newnamedataset<- dataset  %>% janitor::clean_names()
+ecoli1 <- ecoli %>% janitor::clean_names()
+```
+
+# Subset the Data Set for the Case-Control Study
+
+The data set contains more records than needed for the matched case-control study. Thus, you will have to subset the data in order to get the study data set.
+
+```{r}
+## Select only cases that have matched controls
+ecoli2 <- ecoli1 %>% 
+  filter(cdcid !="CDC001" & cdcid !="CDC006" & cdcid !="CDC009" & cdcid !="CDC012" & 
+           cdcid !="CDC015" & cdcid !="CDC022" & cdcid !="CDC023" & cdcid !="CDC024" & 
+           cdcid !="CDC037" & cdcid !="CDC043" & cdcid !="CDC045" & cdcid !="CDC046" & 
+           cdcid !="CDC048" & cdcid !="CDC049" & cdcid !="CDC067" & cdcid !="CDC068")   
+
+## Some cases have multiple controls
+ecoli2 %>%  filter(cdcid == "CDC047")  %>% tabyl(case)
+
+## Only keep controlletter=A for cdcid=="CDC047"
+x <- which(ecoli2$cdcid =="CDC047" & ecoli2$controlletter=="B")   
+ecoli3 <- ecoli2[-x, ]    
+
+dim(ecoli3)
+```
+
+# Recode Variables
+
+For conditional logistic regression, all food item values should be 0 or 1. Recode other values to missing. You can use factors also but that is beyond the scope of this assignment, so we will simply recode the variables.
+
+```{r}
+ecoli3 %>%  tabyl(milk, case)
+
+## milk is the only variable coded as: 0,1,NA
+## all other variables have some NAs coded as 99 and/or 3
+
+ecoli3$xrawcd <- ifelse((ecoli3$rawcd==3 | ecoli3$rawcd==99),NA,ecoli3$rawcd)
+ecoli3 %>%  tabyl(xrawcd, rawcd)
+ecoli3 %>%  tabyl(xrawcd, case)
+```
+
+
+# Create a numeric variable that identifies each pair (case and control pair), also called a statum or group variable.
+
+* This is called strata in the regression code.
+* First, select last two characters of the CDCID string/character variable (new variable stratachar)
+* Then, convert to a numeric format (new variable called stratanum)
+
+```{r}
+ecoli3$stratachar <- substr(ecoli3$cdcid,start=5,stop=6)
+
+ecoli3 %>%  tabyl(stratachar)
+
+ecoli3$stratanum <- as.numeric(ecoli3$stratachar)
+
+ecoli3 %>%  tabyl(stratachar,stratanum)
+```
+
+# Conduct the conditional logistic regression model using one exposure and one outcome.
+ 
+```{r}
+clogit(case ~ milk + strata(stratanum), data=ecoli3)
+## the exponential of the coefficient "exp(coef)" is the odds ratio of 2.0
+```
+
+
+```{r}
+## below is coding trick to output exponentiated 95% CIs
+## these are the 95% CI of the odds ratio
+m <- clogit(case ~ milk + strata(stratanum), data=ecoli3)
+summary(m)
+## probability of observing a z-statistic value more extreme than
+## the one observed "Pr(>|z|)" is the p-value of 0.571.
+```
+
+# Additional example: raw cookie dough variable
+
+```{r}
+m<-clogit(case ~ xrawcd + strata(stratanum), method="exact", data=ecoli3)
+summary(m)
+```
+
+
+```{r}
+## if model does not converge, try to change to a non-exact method
+
+m<-clogit(case ~ xrawcd + strata(stratanum), method="approximate", data=ecoli3)
+summary(m)
+
+## why does the model (still) not converge? let's look at the data
+ecoli3 %>% tabyl(xrawcd, case)
+ecoli3 %>% tabyl(xrawcd, case, cdcid)
+```
+
+* column A (xrawcd=0 for control & case): 2
+* column B (xrawcd=0 for control, 1 for case): 29
+* column C (xrawcd=1 for control, 0 for case): 0
+* column D (xrawcd=1 for control & case): 4
+* dropped observation/missing exposure info: 1
+
+# Note 
+
+In practice, we would then use a different regression model made for small cells called exact logistic regression. R does not have a readily available exact logistic regression package like Stata. (The archived elrm package uses a Markov Chain Monte Carlo algorithm to conduct an approximation for exact logistics regression which we will not use here.)
+
+So for raw cookie dough, the matched Odds Ratio, 95% Confidence Interval, and p-value are provided (obtained from study authors):
+
+* Odds Ratio: 41.3 
+* 95% confidence interval (7.37, >999.99) 
+* p-value <0.001
+
+Use these values in your assignment so you have the correct OR and 95% CI for the raw cookie dough exposure variable.
+ 
+
+ 
+
+ 
+
+
+
+
+ 
+
+
+
